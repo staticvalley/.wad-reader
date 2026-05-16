@@ -1,14 +1,12 @@
 #include <print>
-#include <WADReader.hpp>
+#include <WADFile.hpp>
 
 int main(void) {
 	const char* path = "C:/Users/jrk/Desktop/cs_dust.wad";
-	WADReader wad(path);
+	WADFile wad;
 
-	wad.printHeader();
+	wad.load(path);
 
-	wad.processTextures();
-
-	for (auto s : wad.textures)
+	for (auto s : wad.textures())
 		std::println("{}", s.first);
 }

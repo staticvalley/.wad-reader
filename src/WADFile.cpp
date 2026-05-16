@@ -1,4 +1,4 @@
-#include <WADReader.hpp>
+#include <WADFile.hpp>
 
 #include <string>
 #include <fstream>
@@ -8,63 +8,58 @@
 #include <unordered_map>
 #include <vector>
 
-WADReader::WADReader(const char* path) 
-	: filePath(path)
-{
+WADFile::WADFile() {};
 
-	fileStream = std::ifstream(path, std::ios::binary);
+WADFile::~WADFile() {};
+
+bool WADFile::load(const char* path) {
+
+	// open .wad
+	std::ifstream fileStream = std::ifstream(path, std::ios::binary);
 	if (!fileStream.is_open())
-		throw std::runtime_error(std::format("failed to open BSP file: {}", filePath));
+		return false;
 
-	// read in header from file
-	header = processHeader();
+	// read header, directories, and textures
+	try {
+		processHeader(fileStream);
+		processEntries(fileStream);
+		processTextures(fileStream);
+	}
+	catch (const std::runtime_error& e) {
+		std::println(std::cerr, "WADFile: failed to load {}: {}", path, e.what());
+		return false;
+	}
 
-	// only reading WAD3 files
-	if (std::strncmp(header.magic, WAD_MAGIC, WAD_MAGIC_SIZE) != 0)
-		throw std::runtime_error(std::format("invalid BSP version: {}", header.magic));
-
-	entries = processEntries();
+	return true;
 }
 
-WADReader::~WADReader() {}
-
-void WADReader::printHeader() {
-
-	std::println("filepath: \"{}\"", filePath);
-	std::println("entries: {}", header.nEntries);
-	std::println("directory offset: {}", header.nDirOffset);
-
-}
-
-WADHeader WADReader::processHeader() {
+void WADFile::processHeader(std::ifstream& fileStream) {
 
 	WADHeader newHeader;
 
 	// read and verify BSP version
 	fileStream.read((char*)(&newHeader.magic), sizeof(newHeader.magic));
-	if (!fileStream) {
-		std::cerr << "error reading WAD magic number" << std::endl;
-		return {};
-	}
+	if (!fileStream)
+		throw std::runtime_error(std::format("error reading WAD magic number"));
+
+	// only reading WAD3 files
+	if (std::strncmp(newHeader.magic, WAD_MAGIC, WAD_MAGIC_SIZE) != 0)
+		throw std::runtime_error(std::format("invalid WAD version: {}", newHeader.magic));
 
 	// read in entry information
 	fileStream.read((char*)(&newHeader.nEntries), sizeof(newHeader.nEntries));
-	if (!fileStream) {
-		std::cerr << "error reading entry count" << std::endl;
-		return {};
-	}
+	if (!fileStream)
+		throw std::runtime_error(std::format("error reading entry count"));
 
 	// read in directory offset 
 	fileStream.read((char*)(&newHeader.nDirOffset), sizeof(newHeader.nDirOffset));
-	if (!fileStream) {
-		std::cerr << "error reading directory offset" << std::endl;
-		return {};
-	}
+	if (!fileStream)
+		throw std::runtime_error(std::format("error reading directory offset"));
 	
-	return newHeader;
+	header = std::move(newHeader);
 }
 
-std::vector<WADEntry> WADReader::processEntries() {
+void WADFile::processEntries(std::ifstream& fileStream) {
 	
 	std::vector<WADEntry> wadEntries;
 
@@ -78,15 +73,15 @@ std::vector<WADEntry> WADReader::processEntries() {
 
 		fileStream.read((char*)&newEntry, sizeof(WADEntry));
 		if (!fileStream)
-			throw std::runtime_error("error reading WAD directory entries");
+			throw std::runtime_error(std::format("error reading WAD directory entry {}", i + 1));
 
 		wadEntries.push_back(newEntry);
 	}
 
-	return wadEntries;
+	entries = std::move(wadEntries);
 }
 
-void WADReader::processTextures() {
+void WADFile::processTextures(std::ifstream& fileStream) {
 	
 	// process texture for each entry
 	for (int i = 0; i < entries.size(); i++) {
@@ -101,7 +96,7 @@ void WADReader::processTextures() {
 
 		fileStream.read((char*)&mipTexture, sizeof(mipTexture));
 		if (!fileStream)
-			throw std::runtime_error("error reading WAD mip texture");
+			throw std::runtime_error(std::format("error reading WAD mip texture {}", i + 1));
 
 		uint32_t textureSize = mipTexture.nWidth * mipTexture.nHeight;
 		
@@ -112,7 +107,7 @@ void WADReader::processTextures() {
 		std::vector<uint8_t> pixels(textureSize);
 		fileStream.read((char*)pixels.data(), sizeof(uint8_t) * textureSize);
 		if (!fileStream)
-			throw std::runtime_error("error reading WAD mip texture");
+			throw std::runtime_error(std::format("error reading WAD mip \"{}\" texture pixel data", mipTexture.szName));
 		texture.pixels = std::move(pixels);
 
 		// palette offset is past 3rd mipmap texture
@@ -123,12 +118,12 @@ void WADReader::processTextures() {
 		// read palette
 		fileStream.read((char*)&texture.palette, sizeof(uint8_t) * RGB_PALETTE_SIZE);
 		if (!fileStream)
-			throw std::runtime_error("error reading WAD mip texture");
+			throw std::runtime_error(std::format("error reading WAD mip \"{}\" texture palette data", mipTexture.szName));
 
 		texture.height = mipTexture.nHeight;
 		texture.width = mipTexture.nWidth;
 		std::strncpy(texture.name, mipTexture.szName, WAD_MAX_TEXTURE_NAME);
 
-		textures[mipTexture.szName] = texture;
+		_textures[mipTexture.szName] = texture;
 	}
 }

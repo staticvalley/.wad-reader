@@ -63,30 +63,37 @@ struct WADTexture {
     std::array<uint8_t, RGB_PALETTE_SIZE> palette{};    // palette data
 };
 
-class WADReader {
+class WADFile {
 public:
 
-	WADReader(const char* path);
-	~WADReader();
+    WADFile();
+    ~WADFile();
 
-	void printHeader();
+    // only moves, no copies
+    WADFile(WADFile&&) = default;
+    WADFile& operator=(WADFile&&) = default;
+    WADFile(const WADFile&) = delete;
+    WADFile& operator=(const WADFile&) = delete;
 
-	// process texture sections of wad into <name, texture> hashmap
-	void processTextures();
+    // load WAD3 file from path
+    bool load(const char* path);
 
-	std::unordered_map<std::string, WADTexture> textures;
+    // getters
+    const std::unordered_map<std::string, WADTexture> textures() { return _textures; }
 
 private:
-	const char* filePath;
-	std::ifstream fileStream;
-
-	WADHeader header;
+    WADHeader header{};
 	std::vector<WADEntry> entries;
+
+    // texture name to WADTexture map
+    std::unordered_map<std::string, WADTexture> _textures;
 	
 	// parse WAD version and directory data into header struct
-	WADHeader processHeader();
+	void processHeader(std::ifstream& fileStream);
 
 	// parse entries from directory into vector
-	std::vector<WADEntry> processEntries();
+	void processEntries(std::ifstream& fileStream);
 	
+    // process texture sections of wad into <name, texture> hashmap
+    void processTextures(std::ifstream& fileStream);
 };

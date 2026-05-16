@@ -9,17 +9,17 @@ this is a companion to the [.bsp reader](https://github.com/staticvalley/.bsp-re
 The reader can be used as so:
 
 ```
-#include <WADReader.hpp>
+#include <print>
+#include <WADFile.hpp>
 
 int main(void) {
-	const char* path = "assets/textures/de_dust2.wad";
-	WADReader wad(path);
+	const char* path = "scene/assets/cs_dust.wad";
+	WADFile wad;
 
-	wad.printHeader();
-	
-	wad.processTextures();
+	wad.load(path);
 
-	WADTexture crate = wad.textures["MltryCrteSd"];
+	for (auto s : wad.textures())
+		std::println("{}", s.first);
 }
 ```
 
@@ -28,4 +28,3 @@ int main(void) {
 - can only read mipmap texture entry types (as of now)
 - invalid file handling needs work: missing a few edge cases and could more "gracefully" handle errors.
 - only mipmap level 0 (unscaled) is parsed into the `WADTexture` type (missing 1/2, 1/4, 1/8 textures)
-- could probably just be incorporated into the BSPReader
