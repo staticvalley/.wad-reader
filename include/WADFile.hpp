@@ -79,7 +79,7 @@ public:
     bool load(const char* path);
 
     // getters
-    const std::unordered_map<std::string, WADTexture> textures() { return _textures; }
+    const std::unordered_map<std::string, WADTexture>& textures() const { return _textures; }
 
 private:
     WADHeader header{};
